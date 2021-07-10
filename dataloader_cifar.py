@@ -16,7 +16,7 @@ def unpickle(file):
     return dict
 
 class cifar_dataset(Dataset): 
-    def __init__(self, dataset, r, noise_mode, root_dir, transform, mode, noise_file='', pred=[], probability=[], log=''): 
+    def __init__(self, dataset, r, noise_mode, root_dir, transform, mode, noise_file='', pred=[], probability=[], log='', writer=None): 
         
         self.r = r # noise ratio
         self.transform = transform
@@ -89,8 +89,12 @@ class cifar_dataset(Dataset):
                     auc_meter = AUCMeter()
                     auc_meter.reset()
                     auc_meter.add(probability,clean)        
-                    auc,_,_ = auc_meter.value()               
-                    log.write('Numer of labeled samples:%d   AUC:%.3f\n'%(pred.sum(),auc))
+                    auc, _, _ = auc_meter.value()
+                            
+                    log.write('Number of labeled samples:%d   AUC:%.3f\n' % (pred.sum(), auc))
+                    writer.add_scalar("stats/labeled_samples", pred.sum())
+                    writer.add_scalar("stats/AUC", auc)
+                    writer.flush()
                     log.flush()      
                     
                 elif self.mode == "unlabeled":
@@ -132,7 +136,7 @@ class cifar_dataset(Dataset):
         
         
 class cifar_dataloader():  
-    def __init__(self, dataset, r, noise_mode, batch_size, num_workers, root_dir, log, noise_file=''):
+    def __init__(self, dataset, r, noise_mode, batch_size, num_workers, root_dir, log, writer, noise_file=''):
         self.dataset = dataset
         self.r = r
         self.noise_mode = noise_mode
@@ -140,6 +144,7 @@ class cifar_dataloader():
         self.num_workers = num_workers
         self.root_dir = root_dir
         self.log = log
+        self.writer=writer
         self.noise_file = noise_file
         if self.dataset=='cifar10':
             self.transform_train = transforms.Compose([
@@ -174,7 +179,7 @@ class cifar_dataloader():
             return trainloader
                                      
         elif mode=='train':
-            labeled_dataset = cifar_dataset(dataset=self.dataset, noise_mode=self.noise_mode, r=self.r, root_dir=self.root_dir, transform=self.transform_train, mode="labeled", noise_file=self.noise_file, pred=pred, probability=prob,log=self.log)              
+            labeled_dataset = cifar_dataset(dataset=self.dataset, noise_mode=self.noise_mode, r=self.r, root_dir=self.root_dir, transform=self.transform_train, mode="labeled", noise_file=self.noise_file, pred=pred, probability=prob,log=self.log, writer=self.writer)              
             labeled_trainloader = DataLoader(
                 dataset=labeled_dataset, 
                 batch_size=self.batch_size,
